@@ -15,9 +15,9 @@ SILVER_DIR = DATA_DIR / "silver"   # validated, deduped, typed
 
 SIM = {
     "seed": 42,                 # reproducible datasets (good for tests + demos)
-    "drivers": 120,
+    "drivers": 60,
     "users": 800,
-    "base_rides_per_hour": 60,  # off-peak baseline; rush hour multiplies this
+    "base_rides_per_hour": 75,  # off-peak baseline; rush hour multiplies this
     "peak_multiplier": 3.2,
     "cancel_prob": 0.08,        # rides cancelled mid-trip
     "payment_fail_prob": 0.03,  # payments that stay failed (DQ reconciliation fodder)

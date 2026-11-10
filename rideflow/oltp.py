@@ -43,7 +43,7 @@ class Ride(Base):
 
     ride_id: Mapped[str] = mapped_column(primary_key=True)
     user_id: Mapped[str] = mapped_column(index=True)
-    driver_id: Mapped[str] = mapped_column(index=True)
+    driver_id: Mapped[str | None] = mapped_column(index=True)
     status: Mapped[str]
     request_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     pickup_zone: Mapped[int]

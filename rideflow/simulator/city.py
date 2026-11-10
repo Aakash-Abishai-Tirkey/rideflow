@@ -47,6 +47,15 @@ def zone_center(zone_id: int) -> tuple[float, float]:
     )
 
 
+def zone_of(lat: float, lon: float) -> int:
+    """Nearest zone for a lat/lon point (inverse of zone_center)."""
+    dx = ZONE_KM * 0.012  # degrees per grid step (lon)
+    dy = ZONE_KM * 0.009  # degrees per grid step (lat)
+    x = min(max(round((lon - CENTER_LON) / dx), 0), 3)
+    y = min(max(round((lat - CENTER_LAT) / dy), 0), 3)
+    return y * 4 + x + 1
+
+
 def distance_km(a: int, b: int) -> float:
     """Euclidean inter-zone distance plus intra-zone fudge."""
     za, zb = ZONE_BY_ID[a], ZONE_BY_ID[b]

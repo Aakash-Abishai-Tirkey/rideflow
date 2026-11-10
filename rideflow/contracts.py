@@ -26,13 +26,15 @@ class PaymentStatus(str, Enum):
 
 
 class _Row(BaseModel):
-    model_config = ConfigDict(extra="forbid")  # unknown field = contract violation
+    # unknown field = contract violation; enums stored as their string values
+    model_config = ConfigDict(extra="forbid", use_enum_values=True)
 
 
 class RideRow(_Row):
     ride_id: str
     user_id: str
-    driver_id: str
+    # None = request never matched a driver (unmet demand — cancelled)
+    driver_id: str | None = None
     status: RideStatus
     request_ts: datetime
     pickup_zone: int = Field(ge=1, le=16)
