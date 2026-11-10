@@ -1,10 +1,16 @@
-"""Central configuration: paths, database URLs, simulation parameters."""
+"""Central configuration: paths, database URLs, simulation parameters.
+
+RIDEFLOW_DATA_DIR env var relocates everything at once (handy for CI).
+Tests patch these module attributes directly — which is why pipeline
+modules must read them via `config.X` at call time, never at import time.
+"""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = ROOT / "data"
+DATA_DIR = Path(os.environ.get("RIDEFLOW_DATA_DIR", str(ROOT / "data")))
 
 OLTP_URL = f"sqlite:///{DATA_DIR / 'oltp.db'}"        # source system ("production app")
 WAREHOUSE_URL = f"sqlite:///{DATA_DIR / 'warehouse.db'}"  # analytics star schema

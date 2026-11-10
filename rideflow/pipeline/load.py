@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 from sqlalchemy import create_engine
 
-from rideflow.config import DATA_DIR, WAREHOUSE_URL
+from rideflow import config
 from rideflow.pipeline.extract import TABLES
 from rideflow.pipeline.transform import read_partition, silver_partitions
 from rideflow.pipeline.watermarks import StateStore
@@ -85,8 +85,8 @@ def _load_date_dim(engine) -> None:
 
 
 def load_gold(store: StateStore, run_id: str) -> dict:
-    DATA_DIR.mkdir(exist_ok=True)
-    engine = create_engine(WAREHOUSE_URL)
+    config.DATA_DIR.mkdir(exist_ok=True)
+    engine = create_engine(config.WAREHOUSE_URL)
 
     _run_sql(engine, (MODELS_DIR / "schema.sql").read_text(encoding="utf-8"))
     staged = {t: _stage(store, engine, t) for t in STAGED}

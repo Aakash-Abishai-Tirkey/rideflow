@@ -16,7 +16,8 @@ from pathlib import Path
 import pandas as pd
 from sqlalchemy import select
 
-from rideflow.config import BRONZE_DIR, SIM
+from rideflow import config
+from rideflow.config import SIM
 from rideflow.oltp import Driver, GpsPing, Payment, Ride, RideEvent, User, get_engine
 from rideflow.contracts import (DriverRow, GpsPingRow, PaymentRow, RideEventRow,
                                 RideRow, UserRow)
@@ -62,7 +63,7 @@ def extract_table(store: StateStore, run_id: str, table: str,
     file = None
     if rows:
         dt = run_date or run_id[:8]
-        path = BRONZE_DIR / table / f"dt={dt}" / f"batch-{run_id}.jsonl"
+        path = config.BRONZE_DIR / table / f"dt={dt}" / f"batch-{run_id}.jsonl"
         path.parent.mkdir(parents=True, exist_ok=True)
         # pandas renders NULL datetimes as NaT: sanitize to None -> JSON null
         clean = df.astype(object).where(pd.notna(df), None)

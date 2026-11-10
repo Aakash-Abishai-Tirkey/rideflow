@@ -21,7 +21,7 @@ from datetime import datetime
 
 from sqlalchemy import create_engine, text
 
-from rideflow.config import OLTP_URL, WAREHOUSE_URL
+from rideflow import config
 from rideflow.pipeline.watermarks import StateStore, utc
 
 TOL = 0.01  # revenue reconciliation tolerance (cents)
@@ -220,8 +220,8 @@ ICON = {"pass": "PASS", "warn": "WARN", "fail": "FAIL"}
 
 
 def run_checks(store: StateStore, run_id: str | None = None) -> list[dict]:
-    oltp = create_engine(OLTP_URL)
-    wh = create_engine(WAREHOUSE_URL)
+    oltp = create_engine(config.OLTP_URL)
+    wh = create_engine(config.WAREHOUSE_URL)
     results: list[dict] = []
     with oltp.connect() as oc, wh.connect() as wc:
         for fn in CHECKS:

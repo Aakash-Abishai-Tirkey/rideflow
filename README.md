@@ -1,5 +1,8 @@
 # RideFlow 🚕
 
+<!-- Replace USERNAME with your GitHub handle after the first push. -->
+[![CI](https://github.com/USERNAME/rideflow/actions/workflows/ci.yml/badge.svg)](https://github.com/USERNAME/rideflow/actions/workflows/ci.yml)
+
 A ride-hailing analytics platform built with a **zero-install data engineering stack**:
 SQLite (OLTP + warehouse), Parquet data lake (pyarrow), pydantic data contracts,
 a custom DAG orchestrator, and a Streamlit dashboard — all pure Python.
@@ -62,5 +65,22 @@ fails the run after retries; `--no-strict` downgrades to record-only):
 
 Results land in `state.dq_results` with full history —
 `python -m rideflow.pipeline.dq history` shows the trend.
+
+## Testing
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest tests -v
+```
+
+19 tests run the entire system against per-test temp directories (nothing
+touches `./data`): contract validation (including the NaT-null regression),
+watermark/lookback extraction semantics, silver dedup + quarantine + partition
+compaction, the processed-file ledger, a full pipeline lifecycle (cold start
+reconciliation, incremental no-op, idempotent backfill), the DQ gate blocking
+and healing injected corruption, and a headless render of both dashboard views.
+
+CI (GitHub Actions) runs the suite plus a CLI smoke test
+(`simulator → orchestrator → dq`) on every push.
 
 Status: 🚧 under construction — see `docs/ROADMAP.md`.

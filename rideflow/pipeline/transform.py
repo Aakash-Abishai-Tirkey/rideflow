@@ -16,11 +16,9 @@ from pathlib import Path
 import pandas as pd
 from pydantic import ValidationError
 
-from rideflow.config import BRONZE_DIR, DATA_DIR, SILVER_DIR
+from rideflow import config
 from rideflow.pipeline.extract import TABLES
 from rideflow.pipeline.watermarks import StateStore
-
-QUARANTINE = DATA_DIR / "quarantine"
 
 
 def transform_table(store: StateStore, run_id: str, table: str) -> dict:
@@ -33,7 +31,7 @@ def transform_table(store: StateStore, run_id: str, table: str) -> dict:
     cfg = TABLES[table]
     model = cfg["model"]
 
-    root = BRONZE_DIR / table
+    root = config.BRONZE_DIR / table
     files = sorted(str(p) for p in root.glob("dt=*/batch-*.jsonl")) if root.exists() else []
     files = store.unprocessed_files(table, files)
 
@@ -58,7 +56,7 @@ def transform_table(store: StateStore, run_id: str, table: str) -> dict:
                         "row": r, "errors": [str(err) for err in e.errors()[:3]]})
 
     if bad:
-        qpath = QUARANTINE / table / f"batch-{run_id}.jsonl"
+        qpath = config.DATA_DIR / "quarantine" / table / f"batch-{run_id}.jsonl"
         qpath.parent.mkdir(parents=True, exist_ok=True)
         with open(qpath, "w", encoding="utf-8") as f:
             for b in bad:
@@ -76,7 +74,7 @@ def transform_table(store: StateStore, run_id: str, table: str) -> dict:
 
         pk = cfg["pk"]
         for dt, grp in df.groupby("dt"):
-            part_dir = SILVER_DIR / table / f"dt={dt}"
+            part_dir = config.SILVER_DIR / table / f"dt={dt}"
             part_dir.mkdir(parents=True, exist_ok=True)
             grp.to_parquet(part_dir / f"part-{run_id}.parquet", index=False)
 
@@ -103,7 +101,7 @@ def transform_table(store: StateStore, run_id: str, table: str) -> dict:
 
 def silver_partitions(table: str) -> list[Path]:
     """All partition dirs of a silver table (event date order)."""
-    root = SILVER_DIR / table
+    root = config.SILVER_DIR / table
     if not root.exists():
         return []
     return sorted(root.glob("dt=*"), key=lambda p: p.name)

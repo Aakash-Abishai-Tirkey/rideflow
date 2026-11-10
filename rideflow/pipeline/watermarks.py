@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from sqlalchemy import (Column, DateTime, Integer, MetaData, String, Table,
                         Text, create_engine, delete, insert, select)
 
-from rideflow.config import DATA_DIR, STATE_URL
+from rideflow import config
 
 METADATA = MetaData()
 
@@ -88,9 +88,9 @@ def utc() -> datetime:
 
 
 class StateStore:
-    def __init__(self, url: str = STATE_URL):
-        DATA_DIR.mkdir(exist_ok=True)
-        self.engine = create_engine(url)
+    def __init__(self, url: str | None = None):
+        config.DATA_DIR.mkdir(exist_ok=True)
+        self.engine = create_engine(url or config.STATE_URL)
         METADATA.create_all(self.engine)
 
     # ------------------------------------------------------------- watermarks

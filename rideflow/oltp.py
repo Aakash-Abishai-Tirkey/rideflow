@@ -11,7 +11,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from rideflow.config import DATA_DIR, OLTP_URL
+from rideflow import config
 
 
 class Base(DeclarativeBase):
@@ -99,8 +99,8 @@ def _set_pragmas(dbapi_conn, _record):
 
 
 def get_engine(url: str | None = None):
-    DATA_DIR.mkdir(exist_ok=True)
-    engine = create_engine(url or OLTP_URL, echo=False)
+    config.DATA_DIR.mkdir(exist_ok=True)
+    engine = create_engine(url or config.OLTP_URL, echo=False)
     event.listen(engine, "connect", _set_pragmas)
     return engine
 
