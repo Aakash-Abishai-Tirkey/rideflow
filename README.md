@@ -1,7 +1,7 @@
 # RideFlow 🚕
 
 <!-- Replace USERNAME with your GitHub handle after the first push. -->
-[![CI](https://github.com/USERNAME/rideflow/actions/workflows/ci.yml/badge.svg)](https://github.com/USERNAME/rideflow/actions/workflows/ci.yml)
+[![CI](https://github.com/Aakash-Abishai-Tirkey/rideflow/actions/workflows/ci.yml/badge.svg)](https://github.com/Aakash-Abishai-Tirkey/rideflow/actions/workflows/ci.yml)
 
 A ride-hailing analytics platform built with a **zero-install data engineering stack**:
 SQLite (OLTP + warehouse), Parquet data lake (pyarrow), pydantic data contracts,
