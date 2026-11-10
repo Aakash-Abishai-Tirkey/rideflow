@@ -30,6 +30,22 @@ class _Row(BaseModel):
     model_config = ConfigDict(extra="forbid", use_enum_values=True)
 
 
+class UserRow(_Row):
+    user_id: str
+    signup_ts: datetime
+    home_zone: int = Field(ge=1, le=16)
+    rating: float = Field(ge=0, le=5)
+
+
+class DriverRow(_Row):
+    driver_id: str
+    signup_ts: datetime
+    home_zone: int = Field(ge=1, le=16)
+    status: str  # online / busy / offline
+    rating: float = Field(ge=0, le=5)
+    vehicle: str
+
+
 class RideRow(_Row):
     ride_id: str
     user_id: str
