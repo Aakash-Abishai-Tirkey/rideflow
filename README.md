@@ -26,8 +26,13 @@ python -m rideflow.orchestrator run --backfill         # full reload, identical 
 python -m rideflow.orchestrator status                 # run + task history
 python -m rideflow.pipeline.dq run                     # data quality checks (standalone)
 python -m rideflow.pipeline.dq history                 # DQ results over time
-streamlit run rideflow/dashboard.py                    # explore the data
+streamlit run rideflow/dashboard.py                    # analytics on the warehouse
 ```
+
+The dashboard has two views (sidebar): **Warehouse** — revenue, zone and driver
+analytics from the gold star schema, lifecycle funnel, and the DQ monitoring tab
+(pass/warn/fail per run + full incident history); **Simulator** — the raw OLTP
+source for debugging the generator.
 
 ## Pipeline layers
 

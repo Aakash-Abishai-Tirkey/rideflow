@@ -188,6 +188,11 @@ class StateStore:
                 run_id=run_id, checked_at=utc(), check=check, layer=layer,
                 status=status, metric=metric, detail=detail[:1000]))
 
+    def clear_dq(self, run_id: str) -> None:
+        """Drop this run's DQ results (re-recording after retries stays clean)."""
+        with self.engine.begin() as c:
+            c.execute(delete(DQ_RESULTS).where(DQ_RESULTS.c.run_id == run_id))
+
     def dq_results_of_run(self, run_id: str) -> list:
         with self.engine.connect() as c:
             return c.execute(select(DQ_RESULTS).where(DQ_RESULTS.c.run_id == run_id)

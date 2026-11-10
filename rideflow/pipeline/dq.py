@@ -232,6 +232,7 @@ def run_checks(store: StateStore, run_id: str | None = None) -> list[dict]:
                          metric=None, detail=f"check crashed: {e!r}")
             results.append(r)
     if run_id:
+        store.clear_dq(run_id)  # last attempt wins — retries don't duplicate rows
         for r in results:
             store.record_dq(run_id, r["check"], r["layer"],
                             r["status"], str(r["metric"]), r["detail"])
