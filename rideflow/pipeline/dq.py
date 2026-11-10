@@ -17,7 +17,7 @@ fails the run when any check reaches `fail` (disable with --no-strict).
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import create_engine, text
 
@@ -25,6 +25,30 @@ from rideflow import config
 from rideflow.pipeline.watermarks import StateStore, utc
 
 TOL = 0.01  # revenue reconciliation tolerance (cents)
+EPOCH_WM = "1970-01-01 00:00:00"
+
+
+def _recon_grace_minutes() -> int:
+    """How far behind the watermark reconciliation asserts equality.
+
+    Rides land in the source at COMPLETION time, not request time: a ride
+    requested at wm-30 with a 40-minute span lands during the pipeline run
+    — already counted by the source, not yet in gold. The lookback window
+    is (by design) larger than any in-flight ride span, so everything at or
+    below wm - lookback is contractually in gold; only that settled window
+    is asserted. Newest rows enter the asserted window as the watermark
+    advances, so corruption is caught one run later, not never.
+    """
+    from rideflow.config import SIM
+    return SIM["lookback_minutes"]
+
+
+def _recon_bound(store: StateStore, scope: str) -> datetime | None:
+    """Inclusive timestamp up to which gold must match the source."""
+    wm = store.get(scope)
+    if not wm or wm == EPOCH_WM:
+        return None
+    return datetime.fromisoformat(wm) - timedelta(minutes=_recon_grace_minutes())
 
 
 class DQFailure(Exception):
@@ -40,31 +64,61 @@ class DQFailure(Exception):
 # --------------------------------------------------------------------- checks
 
 def chk_reconcile_rides(oc, wc, store):
-    s = oc.execute(text("SELECT COUNT(*) FROM rides")).scalar()
-    t = wc.execute(text("SELECT COUNT(*) FROM fact_rides")).scalar()
+    bound = _recon_bound(store, "bronze.rides")
+    if bound is not None:
+        s = oc.execute(text("SELECT COUNT(*) FROM rides "
+                            "WHERE julianday(request_ts) <= julianday(:b)"),
+                       {"b": bound.strftime("%Y-%m-%d %H:%M:%S.%f")}).scalar()
+        t = wc.execute(text("SELECT COUNT(*) FROM fact_rides "
+                            "WHERE julianday(request_ts) <= julianday(:b)"),
+                       {"b": bound.strftime("%Y-%m-%d %H:%M:%S.%f")}).scalar()
+        scope = f"through wm-{_recon_grace_minutes()}m"
+    else:
+        s = oc.execute(text("SELECT COUNT(*) FROM rides")).scalar()
+        t = wc.execute(text("SELECT COUNT(*) FROM fact_rides")).scalar()
+        scope = "full"
     return dict(check="reconcile_rides", layer="source<->gold",
                 status="pass" if t - s == 0 else "fail",
-                metric=t - s, detail=f"oltp={s:,} gold={t:,}")
+                metric=t - s, detail=f"[{scope}] oltp={s:,} gold={t:,}")
 
 
 def chk_reconcile_payments(oc, wc, store):
-    s_n = oc.execute(text(
-        "SELECT COUNT(*) FROM payments WHERE status='completed'")).scalar()
-    t_n = wc.execute(text(
-        "SELECT COUNT(*) FROM fact_payments WHERE status='completed'")).scalar()
-    s_s = oc.execute(text(
-        "SELECT COALESCE(SUM(amount),0) FROM payments WHERE status='completed'")).scalar()
-    t_s = wc.execute(text(
-        "SELECT COALESCE(SUM(amount),0) FROM fact_payments WHERE status='completed'")).scalar()
-    ok = s_n == t_n and abs(s_s - t_s) < TOL
+    bound = _recon_bound(store, "bronze.payments")
+    if bound is not None:
+        src = oc.execute(text(
+            "SELECT COUNT(*), COALESCE(SUM(amount),0) FROM payments "
+            "WHERE status='completed' AND julianday(paid_at) <= julianday(:b)"),
+            {"b": bound.strftime("%Y-%m-%d %H:%M:%S.%f")}).one()
+        tgt = wc.execute(text(
+            "SELECT COUNT(*), COALESCE(SUM(amount),0) FROM fact_payments "
+            "WHERE status='completed' AND julianday(paid_at) <= julianday(:b)"),
+            {"b": bound.strftime("%Y-%m-%d %H:%M:%S.%f")}).one()
+    else:
+        src = oc.execute(text(
+            "SELECT COUNT(*), COALESCE(SUM(amount),0) FROM payments "
+            "WHERE status='completed'")).one()
+        tgt = wc.execute(text(
+            "SELECT COUNT(*), COALESCE(SUM(amount),0) FROM fact_payments "
+            "WHERE status='completed'")).one()
+    ok = src[0] == tgt[0] and abs(src[1] - tgt[1]) < TOL
     return dict(check="reconcile_payments", layer="source<->gold",
-                status="pass" if ok else "fail", metric=t_s - s_s,
-                detail=f"oltp: {s_n:,} rows ${s_s:,.2f} | gold: {t_n:,} rows ${t_s:,.2f}")
+                status="pass" if ok else "fail", metric=round(tgt[1] - src[1], 2),
+                detail=f"oltp: {src[0]:,} rows ${src[1]:,.2f} | "
+                       f"gold: {tgt[0]:,} rows ${tgt[1]:,.2f}")
 
 
 def chk_reconcile_events(oc, wc, store):
-    s = oc.execute(text("SELECT COUNT(*) FROM ride_events")).scalar()
-    t = wc.execute(text("SELECT COUNT(*) FROM fact_ride_events")).scalar()
+    bound = _recon_bound(store, "bronze.ride_events")
+    if bound is not None:
+        s = oc.execute(text("SELECT COUNT(*) FROM ride_events "
+                            "WHERE julianday(event_ts) <= julianday(:b)"),
+                       {"b": bound.strftime("%Y-%m-%d %H:%M:%S.%f")}).scalar()
+        t = wc.execute(text("SELECT COUNT(*) FROM fact_ride_events "
+                            "WHERE julianday(event_ts) <= julianday(:b)"),
+                       {"b": bound.strftime("%Y-%m-%d %H:%M:%S.%f")}).scalar()
+    else:
+        s = oc.execute(text("SELECT COUNT(*) FROM ride_events")).scalar()
+        t = wc.execute(text("SELECT COUNT(*) FROM fact_ride_events")).scalar()
     return dict(check="reconcile_events", layer="source<->gold",
                 status="pass" if t - s == 0 else "fail",
                 metric=t - s, detail=f"oltp={s:,} gold={t:,}")

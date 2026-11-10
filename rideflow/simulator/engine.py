@@ -107,6 +107,22 @@ class Simulator:
             s.commit()
         self.user_ids = [u["user_id"] for u in users]
 
+    def resume(self) -> None:
+        """Continue simulating against an already-populated database.
+
+        Loads users/drivers into memory; drivers start a fresh shift (free
+        immediately, positioned at their home zones).
+        """
+        with Session(self.engine) as s:
+            self.user_ids = s.scalars(select(User.user_id)).all()
+            rows = s.execute(select(Driver.driver_id, Driver.home_zone,
+                                    Driver.rating, Driver.vehicle)).all()
+        self.drivers = [
+            SimDriver(driver_id=d, home_zone=z, zone=z,
+                      free_at=datetime(2000, 1, 1), rating=r, vehicle=v)
+            for d, z, r, v in rows
+        ]
+
     # --------------------------------------------------------- demand helpers
 
     def _build_hour_rates(self) -> list[float]:

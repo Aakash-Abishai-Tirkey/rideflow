@@ -37,6 +37,18 @@ analytics from the gold star schema, lifecycle funnel, and the DQ monitoring tab
 (pass/warn/fail per run + full incident history); **Simulator** — the raw OLTP
 source for debugging the generator.
 
+## Live demo
+
+```bash
+python -m rideflow.demo                          # simulator + pipeline every 45s
+streamlit run rideflow/dashboard.py              # then toggle "Live mode" (sidebar)
+```
+
+The simulator generates rides in real time (one simulated minute per second),
+the orchestrator ingests them incrementally every 45 seconds — watch the
+warehouse KPIs climb, the funnel fill, and the DQ gate stay green on every pass.
+`--speed` and `--interval` control the pace; Ctrl+C stops cleanly.
+
 ## Pipeline layers
 
 | Layer | Format | Guarantee |
