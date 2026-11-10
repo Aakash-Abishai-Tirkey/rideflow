@@ -70,6 +70,17 @@ PROCESSED = Table(
     Column("rows_bad", Integer),
     Column("processed_at", DateTime),
 )
+DQ_RESULTS = Table(
+    "dq_results", METADATA,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("run_id", String, index=True),
+    Column("checked_at", DateTime),
+    Column("check", String),
+    Column("layer", String),
+    Column("status", String),   # pass / warn / fail
+    Column("metric", String),
+    Column("detail", Text),
+)
 
 
 def utc() -> datetime:
@@ -168,3 +179,24 @@ class StateStore:
             c.execute(insert(PROCESSED).values(
                 file=file, table=table, run_id=run_id,
                 rows_good=rows_good, rows_bad=rows_bad, processed_at=utc()))
+
+    # ------------------------------------------------------------- dq results
+    def record_dq(self, run_id: str, check: str, layer: str, status: str,
+                  metric: str, detail: str) -> None:
+        with self.engine.begin() as c:
+            c.execute(insert(DQ_RESULTS).values(
+                run_id=run_id, checked_at=utc(), check=check, layer=layer,
+                status=status, metric=metric, detail=detail[:1000]))
+
+    def dq_results_of_run(self, run_id: str) -> list:
+        with self.engine.connect() as c:
+            return c.execute(select(DQ_RESULTS).where(DQ_RESULTS.c.run_id == run_id)
+                             .order_by(DQ_RESULTS.c.id)).all()
+
+    def dq_runs(self, n: int = 10) -> list:
+        """DQ-bearing runs (pipeline + standalone), newest first."""
+        with self.engine.connect() as c:
+            return c.execute(
+                select(RUNS).where(RUNS.c.run_id.in_(
+                    select(DQ_RESULTS.c.run_id).distinct()))
+                .order_by(RUNS.c.started_at.desc()).limit(n)).all()

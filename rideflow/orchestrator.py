@@ -25,6 +25,7 @@ from rideflow.pipeline.extract import TABLES, extract_table
 from rideflow.pipeline.load import STAGED, load_gold
 from rideflow.pipeline.transform import transform_table
 from rideflow.pipeline.watermarks import StateStore, utc
+from rideflow.pipeline.dq import DQFailure, run_checks, summarize, utc
 
 
 @dataclass
@@ -34,7 +35,7 @@ class Task:
     depends: list[str] = field(default_factory=list)
 
 
-def build_tasks(store: StateStore, run_id: str) -> list[Task]:
+def build_tasks(store: StateStore, run_id: str, strict: bool = True) -> list[Task]:
     tasks: list[Task] = []
 
     for table in TABLES:
@@ -57,16 +58,35 @@ def build_tasks(store: StateStore, run_id: str) -> list[Task]:
         return load_gold(store, run_id)
 
     tasks.append(Task("load_gold", load_fn, [f"transform_{t}" for t in STAGED]))
+
+    def make_dq(strict: bool):
+        def fn(ctx: dict) -> dict:
+            results = run_checks(store, run_id)
+            s = summarize(results)
+            for r in results:
+                if r["status"] != "pass":
+                    print(f"  {'WARN' if r['status'] == 'warn' else 'FAIL'} "
+                          f"dq.{r['check']}: {r['detail']}")
+            if strict and s["fails"]:
+                raise DQFailure(results)
+            return s
+        return fn
+
+    tasks.append(Task("dq_gate", make_dq(strict), ["load_gold"]))
     return tasks
 
 
-def execute(store: StateStore, backfill: bool = False) -> dict:
+def execute(store: StateStore, backfill: bool = False, strict: bool = True) -> dict:
     if backfill:
         store.clear_prefix("bronze.")
         store.clear_prefix("silver.")
 
     run_id = store.start_run("backfill" if backfill else "incremental")
-    tasks = build_tasks(store, run_id)
+    try:
+        tasks = build_tasks(store, run_id, strict=strict)
+    except Exception:
+        store.finish_run(run_id, "failed")
+        raise
     ctx: dict = {}
     pending = list(tasks)
     done: set[str] = set()
@@ -133,6 +153,8 @@ def main() -> None:
     p_run = sub.add_parser("run", help="execute the pipeline DAG")
     p_run.add_argument("--backfill", action="store_true",
                        help="reset watermarks and reload everything")
+    p_run.add_argument("--no-strict", action="store_true",
+                       help="record DQ results but never fail the run")
     p_status = sub.add_parser("status", help="show run history")
     p_status.add_argument("-n", type=int, default=5)
     args = ap.parse_args()
@@ -141,7 +163,7 @@ def main() -> None:
     if args.cmd == "status":
         status(store, args.n)
     else:
-        execute(store, backfill=args.backfill)
+        execute(store, backfill=args.backfill, strict=not args.no_strict)
 
 
 if __name__ == "__main__":
